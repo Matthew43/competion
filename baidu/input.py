@@ -2,11 +2,11 @@ import os
 import tensorflow as tf
 import matplotlib.pyplot as plt
 
-image_dir = 'E:\\train'
-id_map_label = 'E:\\大数据\\百度\\训练数据\\data_train_image.txt'
 
 
-def get_image_and_label():
+
+def get_image_and_label(image_dir,id_map_label):
+
     id2label = {}
     with open(id_map_label, 'r') as f:
         for line in f.readlines():
@@ -21,16 +21,20 @@ def get_image_and_label():
             # print(file)
             id = file.split('.')[0]
             image = os.path.join(root, file)
-            images.append(image)
-            labels.append(int(id2label[id]))
+            if id in id2label:
+                images.append(image)
+                labels.append(int(id2label[id]))
+            else:
+                print('%s not in id map text '%id)
     # for i,l in zip(images,labels):
     #     print(i,l)
     # print(len(images),' ',len(labels) )
+    print(len(set(labels)))
 
     return images, labels
 
 
-def get_batch(images, labels, image_W, image_H, batch_size, capacity):
+def get_batch(images, labels, image_W, image_H, batch_size, n_classes,capacity,min_after_dequeue):
     '''
     :param labels: list type
     :param image_W: image width
@@ -56,41 +60,44 @@ def get_batch(images, labels, image_W, image_H, batch_size, capacity):
 
     image_batch, label_batch = tf.train.shuffle_batch([images, labels], batch_size=batch_size,
                                               num_threads=64,
-                                              capacity=capacity,min_after_dequeue=capacity-1)
+                                              capacity=capacity,min_after_dequeue=min_after_dequeue)
 
-    label_batch = tf.reshape(label_batch, [batch_size])
+    label_batch = tf.one_hot(label_batch, depth=n_classes)
+    label_batch = tf.cast(label_batch, dtype=tf.int32)
+    label_batch = tf.reshape(label_batch, [batch_size, n_classes])
+    # label_batch = tf.reshape(label_batch, [batch_size])
     image_batch = tf.cast(image_batch, tf.float32)
 
-    return label_batch,image_batch
+    return image_batch,label_batch
 
-if __name__ == '__main__':
-    BATCH_SIZE = 2
-    CAPACITY = 256
-    IMG_W = 208
-    IMG_H = 208
-    images, labels = get_image_and_label()
-    label_batch, image_batch = get_batch(images,labels,IMG_W,IMG_H,BATCH_SIZE,CAPACITY)
-
-    with tf.Session() as sess:
-        i = 0
-        coord = tf.train.Coordinator()
-        threads = tf.train.start_queue_runners(coord=coord)
-
-        try:
-            while not coord.should_stop() and i<1:
-
-                img, label = sess.run([image_batch, label_batch])
-
-                # just test one batch
-                for j in range(BATCH_SIZE):
-                    print('label: %d' %label[j])
-                    plt.imshow(img[j,:,:,:])
-                    plt.show()
-                i+=1
-
-        except tf.errors.OutOfRangeError:
-            print('done!')
-        finally:
-            coord.request_stop()
-        coord.join(threads)
+# if __name__ == '__main__':
+#     BATCH_SIZE = 2
+#     CAPACITY = 256
+#     IMG_W = 208
+#     IMG_H = 208
+#     images, labels = get_image_and_label()
+#     image_batch,label_batch  = get_batch(images,labels,IMG_W,IMG_H,BATCH_SIZE,CAPACITY)
+#
+#     with tf.Session() as sess:
+#         i = 0
+#         coord = tf.train.Coordinator()
+#         threads = tf.train.start_queue_runners(coord=coord)
+#
+#         try:
+#             while not coord.should_stop() and i<1:
+#
+#                 img, label = sess.run([image_batch, label_batch])
+#
+#                 # just test one batch
+#                 for j in range(BATCH_SIZE):
+#                     print('label: %d' %label[j])
+#                     plt.imshow(img[j,:,:,:])
+#                     plt.show()
+#                 i+=1
+#
+#         except tf.errors.OutOfRangeError:
+#             print('done!')
+#         finally:
+#             coord.request_stop()
+#         coord.join(threads)
 
